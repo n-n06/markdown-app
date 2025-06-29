@@ -7,6 +7,7 @@ from alembic import context
 
 from src.db import settings
 from src.notes.models import Note
+from src.auth.models import User
 from src.db import Base
 
 # this is the Alembic Config object, which provides

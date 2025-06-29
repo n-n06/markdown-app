@@ -11,6 +11,7 @@ class NoteOut(BaseModel):
     title: str
     content: str
     created_at: datetime
+    last_edited: datetime
 
     class Config:
         orm_model=True
