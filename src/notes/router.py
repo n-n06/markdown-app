@@ -1,16 +1,19 @@
-from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi.responses import HTMLResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.auth.models import User
 from src.db import get_db
 from src.notes.models import Note
-from src.notes.schemas import NoteCreate, NoteOut
+from src.notes.schemas import GrammarCorrection, NoteCreate, NoteOut, NoteUpdate
+from src.notes.service import GrammarService, render
 from src.auth.dependencies import current_active_user
+from src.auth.models import User
 
 
 router = APIRouter(prefix="/notes", tags=["Notes"])
+grammar = GrammarService()
+
 
 @router.post("/upload")
 async def upload_file(
@@ -77,7 +80,7 @@ async def get_note(
     current_user: User = Depends(current_active_user)
 ):
     result = await db.execute(select(Note).where(
-        Note.id == note_id, Note.user_id == User.id
+        Note.id == note_id, Note.user_id == current_user.id
     ))
     note = result.scalar_one_or_none()
 
@@ -87,15 +90,34 @@ async def get_note(
     return note
 
 
-@router.patch("/{note_id}", response_model=NoteOut)
-async def edit_note(
+@router.get("/{note_id}/render/", response_class=HTMLResponse)
+async def render_note(
+    note_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(current_active_user)
+):
+    result = await db.execute(select(Note).where(
+        Note.id == note_id, Note.user_id == current_user.id
+    ))
+    note = result.scalar_one_or_none()
+
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+
+    return render(note)
+
+
+@router.put("/{note_id}", response_model=NoteOut)
+async def update_note(
     note_id: int, 
     note_data: NoteCreate, 
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(current_active_user)
 ):
+    """Replaces everything - uses PUT method"""
+    
     result = await db.execute(select(Note).where(
-        Note.id == note_id, Note.user_id == User.id
+        Note.id == note_id, Note.user_id == current_user.id
     ))
     note = result.scalar_one_or_none()
 
@@ -109,3 +131,58 @@ async def edit_note(
     await db.refresh(note)
 
     return note
+
+
+@router.patch("/{note_id}", response_model=NoteOut)
+async def edit_note(
+    note_id: int, 
+    note_data: NoteUpdate, 
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(current_active_user)
+):
+    """Replaces either title or content or both :)"""
+
+    result = await db.execute(select(Note).where(
+        Note.id == note_id, Note.user_id == current_user.id
+    ))
+    note = result.scalar_one_or_none()
+
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    if note_data.title is None and note_data.content is None:
+        raise HTTPException(
+            status_code=400, detail="Provide either title or content"
+        )
+
+
+    if note_data.title is not None:
+        note.title = note_data.title
+    if note_data.content is not None:
+        note.content = note_data.content
+    
+
+    await db.commit()
+    await db.refresh(note)
+
+    return note
+
+
+@router.post("/{note_id}/grammar/", response_model=list[GrammarCorrection])
+async def check_grammar(
+    note_id: int, 
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(current_active_user)
+):
+    """Replaces either title or content or both :)"""
+
+    db_result = await db.execute(select(Note).where(
+        Note.id == note_id, Note.user_id == current_user.id
+    ))
+    note = db_result.scalar_one_or_none()
+
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    grammar_check_result = grammar.check_grammar(note.content)
+
+    return grammar_check_result

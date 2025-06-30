@@ -6,6 +6,10 @@ class NoteCreate(BaseModel):
     title: str
     content: str
 
+class NoteUpdate(BaseModel):
+    title: str | None = None
+    content: str | None = None
+
 class NoteOut(BaseModel):
     id: int
     title: str
@@ -15,3 +19,9 @@ class NoteOut(BaseModel):
 
     class Config:
         orm_model=True
+
+class GrammarCorrection(BaseModel):
+    start: int
+    end: int
+    mistake: str
+    replacements: list[str]

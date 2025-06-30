@@ -5,7 +5,7 @@ from src.config import settings
 
 engine = create_async_engine(
     url=settings.db_url_async,
-    echo=True,  # logging
+    echo=False,  # logging
     pool_size=5, # connetcion count
     max_overflow=10 # additional connetion count
 )
