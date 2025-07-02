@@ -1,5 +1,3 @@
-from aiocache.decorators import cached
-from aiocache.serializers import JsonSerializer
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
 from sqlalchemy import select
@@ -11,7 +9,6 @@ from src.notes.schemas import GrammarCorrection, NoteCreate, NoteOut, NoteUpdate
 from src.notes.service import GrammarService, render
 from src.auth.dependencies import current_active_user
 from src.auth.models import User
-from src.redis.service import make_key, redis_cache
 
 
 router = APIRouter(prefix="/notes", tags=["Notes"])
@@ -170,7 +167,6 @@ async def edit_note(
     return note
 
 
-@cached(redis_cache, key_builder=make_key, serializer=JsonSerializer)
 @router.post("/{note_id}/grammar/", response_model=list[GrammarCorrection])
 async def check_grammar(
     note_id: int, 
@@ -187,6 +183,6 @@ async def check_grammar(
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
     
-    grammar_check_result = grammar.check_grammar(note.content)
+    grammar_check_result = await grammar.check_grammar_async(note.content)
 
     return grammar_check_result
